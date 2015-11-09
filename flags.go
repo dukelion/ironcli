@@ -117,6 +117,10 @@ func (wf *WorkerFlags) label() *string {
 	return wf.String("label", "", "optional: specify label for a task")
 }
 
+func (wf *WorkerFlags) encryptionKey() *string {
+	return wf.String("encryption-key", "", "optional: specify a hex encoded encryption key")
+}
+
 func allowedSymbolsOnly(s string) error {
 	for _, runeValue := range s {
 		if !(runeValue == '/' || runeValue == '_' || runeValue == '-' || unicode.IsLetter(runeValue) || unicode.IsNumber(runeValue)) {

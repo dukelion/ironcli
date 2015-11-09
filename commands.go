@@ -125,14 +125,15 @@ type QueueCmd struct {
 	command
 
 	// flags
-	payload     *string
-	payloadFile *string
-	priority    *int
-	timeout     *int
-	delay       *int
-	wait        *bool
-	cluster     *string
-	label       *string
+	payload       *string
+	payloadFile   *string
+	priority      *int
+	timeout       *int
+	delay         *int
+	wait          *bool
+	cluster       *string
+	label         *string
+	encryptionKey *string
 
 	// payload
 	task worker.Task
@@ -274,6 +275,7 @@ func (q *QueueCmd) Flags(args ...string) error {
 	q.wait = q.flags.wait()
 	q.cluster = q.flags.cluster()
 	q.label = q.flags.label()
+	q.encryptionKey = q.flags.encryptionKey()
 
 	err := q.flags.Parse(args)
 	if err != nil {
@@ -305,15 +307,25 @@ func (q *QueueCmd) Args() error {
 	if *q.priority > -3 && *q.priority < 3 {
 		priority = q.priority
 	}
+	var encryption string
+	if *q.encryptionKey != "" && payload != "" {
+		encryption = "aes-cfb" // TODO support other f(x) ?
+		var err error
+		payload, err = aesEncrypt(*q.encryptionKey, payload)
+		if err != nil {
+			return err
+		}
+	}
 
 	q.task = worker.Task{
-		CodeName: q.flags.Arg(0),
-		Payload:  payload,
-		Priority: priority,
-		Timeout:  &timeout,
-		Delay:    &delay,
-		Cluster:  *q.cluster,
-		Label:    *q.label,
+		CodeName:   q.flags.Arg(0),
+		Payload:    payload,
+		Priority:   priority,
+		Timeout:    &timeout,
+		Delay:      &delay,
+		Cluster:    *q.cluster,
+		Label:      *q.label,
+		Encryption: encryption,
 	}
 
 	return nil

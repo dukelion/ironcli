@@ -3,6 +3,11 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -117,4 +122,38 @@ func pushCodes(zipName string, w *worker.Worker, args worker.Code) (*worker.Code
 	var data worker.Code
 	err = json.NewDecoder(response.Body).Decode(&data)
 	return &data, err
+}
+
+// TODO we should probably support other functions at
+// some point so that people have a choice.
+//
+// - expects a hex encoded key of length 16, 24, or 32 bytes [decoded]
+//   to select AES-128, AES-192, or AES-256.
+// - returns a base64 ciphertext with a new, random iv in the first 16 bytes
+//   of the cipher
+func aesEncrypt(publicKeyHex, payloadPlain string) (string, error) {
+	key, err := hex.DecodeString(publicKeyHex)
+	if err != nil {
+		return "", err
+	}
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", err
+	}
+
+	pbytes := []byte(payloadPlain)
+
+	// The IV needs to be unique, but not secure. Therefore it's common to
+	// include it at the beginning of the ciphertext.
+	ciphertext := make([]byte, aes.BlockSize+len(pbytes))
+	iv := ciphertext[:aes.BlockSize]
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return "", err
+	}
+
+	stream := cipher.NewCFBEncrypter(block, iv)
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], pbytes)
+
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
